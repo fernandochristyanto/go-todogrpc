@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	cred "github.com/fernandochristyanto/todogrpc/creds"
 	pb "github.com/fernandochristyanto/todogrpc/proto/todo"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/metadata"
 	"log"
 	"path/filepath"
 )
@@ -23,9 +25,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error creating TLS creds: %s", err)
 	}
-
+	grpcDialOpts := []grpc.DialOption{
+		grpc.WithTransportCredentials(creds),
+	}
 	// Setup connection to gRPC server
-	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(creds))
+	conn, err := grpc.Dial(address, grpcDialOpts...)
 	if err != nil {
 		log.Fatalf("Did not connect: %v", err)
 	}
@@ -34,11 +38,20 @@ func main() {
 	// Setup client for service
 	todoClient := pb.NewTodoTransactionClient(conn)
 
-	getTodosResponse, err := todoClient.GetTodos(context.Background(), &pb.GetTodosRequest{})
+	/**
+	 * Calling the service
+	 */
+	// Create a new metadata with serverkey
+	md := metadata.Pairs("serverkey", cred.ServerKey)
+	// Attach metadata to context
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
+	getTodosResponse, err := todoClient.GetTodos(ctx, &pb.GetTodosRequest{})
+
 	if err != nil {
 		log.Fatalf("Could not transact: %v", err)
 	}
 
+	// Print values
 	for _, todo := range getTodosResponse.Todos {
 		fmt.Println(todo.GetTaskName())
 	}

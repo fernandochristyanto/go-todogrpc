@@ -2,6 +2,7 @@ package main
 
 import (
 	pb "github.com/fernandochristyanto/todogrpc/proto/todo"
+	"github.com/fernandochristyanto/todogrpc/server/interceptor"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -74,12 +75,21 @@ func main() {
 
 	// Create new TLS credentials
 	creds, err := credentials.NewServerTLSFromFile(certPath, keyPath)
+	grpcOpts := []grpc.ServerOption{
+		// The following grpc.ServerOption adds an interceptor for all unary
+		// RPCs. To configure an interceptor for streaming RPCs, see:
+		// https://godoc.org/google.golang.org/grpc#StreamInterceptor
+		grpc.UnaryInterceptor(interceptor.EnsureValidStaticApplicationKey),
+		// Enable TLS for all incoming connections.
+		grpc.Creds(creds),
+	}
+
 	if err != nil {
 		log.Fatalf("Could not load TLS keys: %s", err)
 	}
 	// Declare new gRPC server with TLS
-	grpcServer := grpc.NewServer(grpc.Creds(creds))
-
+	grpcServer := grpc.NewServer(grpcOpts...)
+	
 	// Register transaction servers
 	pb.RegisterTodoTransactionServer(grpcServer, &todoTransactionImpl{})
 
